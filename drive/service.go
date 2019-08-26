@@ -56,17 +56,6 @@ func GetClient(scope ...string) (*http.Client, error) {
 	return config.Client(context.Background(), tok), nil
 }
 
-// Attempt to verify that Drive is running.
-func ping(service *drive.Service) (bool, error) {
-	// Test the connection by listing files.
-	rows, err := service.Files.List(). /*Fields("id, description").*/ Do()
-	if err != nil {
-		return false, err
-	}
-
-	return len(rows.Items) > 0, nil
-}
-
 // Request a token from the web, then returns the retrieved token.
 func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
@@ -87,23 +76,37 @@ func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 }
 
 // Return a path constructed from the specified relative path and the user's home directory.
+// This will panic if there is no current user.
 func homePath(relPath string) string {
 	usr, err := user.Current()
-	if err != nil {
-		log.Fatalf("Unable to get current user: %v", err)
+	if err != nil || usr == nil {
+		log.Panicf("Unable to get current user: %v", err)
+	}
+	if usr.HomeDir == "" {
+		log.Panic("No home directory for user")
 	}
 
 	return filepath.Join(usr.HomeDir, relPath)
 }
 
+// Attempt to verify that Drive is running.
+func ping(service *drive.Service) (bool, error) {
+	// Test the connection by listing files.
+	rows, err := service.Files.List(). /*Fields("id, description").*/ Do()
+	if err != nil {
+		return false, err
+	}
+
+	return len(rows.Items) > 0, nil
+}
+
 // Retrieves a token from a local file and decodes it.
 func readToken(absPath string) (*oauth2.Token, error) {
 	f, err := os.Open(absPath)
-	defer f.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = f.Close() }()
 
 	tok := &oauth2.Token{}
 	err = json.NewDecoder(f).Decode(tok)
@@ -119,8 +122,7 @@ func saveToken(absPath string, token *oauth2.Token) error {
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("unable to open %s for writing", absPath))
 	}
+	defer func() { _ = f.Close() }()
 
-	defer f.Close()
-	json.NewEncoder(f).Encode(token)
-	return nil
+	return json.NewEncoder(f).Encode(token)
 }
