@@ -1,4 +1,4 @@
-module github.com/madkins23/google
+module github.com/madkins23/go-google
 
 go 1.12
 
