@@ -4,4 +4,4 @@
 // This code is Linux-dependent due to assumptions made about the SSH directory location.
 //
 // If you need this functionality consider copying the code into your own project and modifying accordingly.
-package google
+package go_google
