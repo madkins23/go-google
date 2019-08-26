@@ -1,8 +1,0 @@
-#!/bin/bash
-
-DIR=`readlink -f "$0"`
-
-export GOPATH=$(dirname $(dirname $(dirname $(dirname $(dirname $(dirname "$DIR"))))))
-export GOROOT=$(dirname $(dirname $(dirname "$DIR")))
-
-godoc -http=:6060
