@@ -1,0 +1,6 @@
+* write token to file
+* check for final items (e.g. SHA1 bit)
+  * code_challenge (uses code verifier)
+  * code_challenge_method
+  [code_challenge must also be sent when using token?]
+
