@@ -47,8 +47,6 @@ type authorizer struct {
 func NewAuthorizer(applicationName string, accessScopes []string) (Authorizer, error) {
 	var err error
 
-	fixAccessScopes(accessScopes)
-
 	state, err := makeStateString()
 	if err != nil {
 		return nil, xerrors.Errorf("make auth state: %w", err)
@@ -56,7 +54,7 @@ func NewAuthorizer(applicationName string, accessScopes []string) (Authorizer, e
 
 	authorizer := &authorizer{
 		appName: applicationName,
-		scopes:  accessScopes,
+		scopes:  fixedAccessScopes(accessScopes),
 		state:   state,
 	}
 
@@ -198,10 +196,14 @@ const (
 	accessScopePrefix = "https://www.googleapis.com/auth/"
 )
 
-func fixAccessScopes(scopes []string) {
+func fixedAccessScopes(scopes []string) []string {
+	fixed := make([]string, len(scopes))
+
 	for index, scope := range scopes {
-		scopes[index] = accessScopePrefix + scope
+		fixed[index] = accessScopePrefix + scope
 	}
+
+	return fixed
 }
 
 const (

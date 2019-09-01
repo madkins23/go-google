@@ -3,4 +3,5 @@
   * code_challenge (uses code verifier)
   * code_challenge_method
   [code_challenge must also be sent when using token?]
+* can we detect changes in access assigned to token and re-get token?
 
