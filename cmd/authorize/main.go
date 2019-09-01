@@ -1,7 +1,5 @@
-// The authorize application is used to acquire an initial access token for Google API usage.
-// Originally this was to be separated from the actual applications to be written,
-// but the initial access token acquisition is now in madkins23/oauth2.authorizer.go,
-// so now this application is really kind of redundant except for testing.
+// The authorize command acquires an initial access token for Google API usage.
+// See the README.md file for more information.
 package main
 
 import (

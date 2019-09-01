@@ -73,6 +73,12 @@ var (
 	challengeMethod = goauth2.SetAuthURLParam("code_challenge_method", "plain")
 )
 
+var (
+	errNoAuthToken     = xerrors.New("no auth token")
+	errEmptyServerPort = xerrors.New("empty loopback server port")
+	errServerPortColon = xerrors.New("loopback server port contains a colon")
+)
+
 // GetClient returns an HTTP client that can be used to access Google APIs.
 // Handles authorization for the application, creating token file if necessary.
 // Get service from appropriate API (e.g. google.golang.org/api/drive.NewService()).
@@ -99,9 +105,12 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 	}
 
 	auth.token, err = loadToken(auth.tokenPath)
-	err = xerrors.New("TODO: temporary")
+	if err == nil && auth.token == nil {
+		err = errNoAuthToken
+	}
+
 	if err != nil {
-		fmt.Println("Acquiring token from Google OAuth2 server.")
+		fmt.Printf("Acquiring token from Google OAuth2 server because:\n  %v\n", err.Error())
 
 		// Configure listener to be used for loopback server on a random port.
 		auth.listener, err = net.Listen("tcp", "127.0.0.1:0")
@@ -116,11 +125,11 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 		}
 
 		if requestUrl.Port() == "" {
-			return nil, xerrors.New("empty loopback server port")
+			return nil, errEmptyServerPort
 		}
 
 		if strings.Contains(requestUrl.Port(), ":") {
-			return nil, xerrors.New("loopback server port contains a colon")
+			return nil, errServerPortColon
 		}
 
 		// Configure redirect URL using listener port.
@@ -160,7 +169,7 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 	}
 
 	if auth.token == nil {
-		return nil, xerrors.New("unable to acquire token")
+		return nil, errNoAuthToken
 	}
 
 	return auth.config.Client(auth.ctxt, auth.token), nil
@@ -191,11 +200,13 @@ func (auth *authorizer) handleCallback(writer http.ResponseWriter, request *http
 	} else if auth.token, err = auth.config.Exchange(
 		auth.ctxt, code, goauth2.AccessTypeOffline, challengeMethod, auth.verifier); err != nil {
 		err = xerrors.Errorf("get token: %w", err)
+	} else if auth.token == nil {
+		err = errNoAuthToken
 	} else if err = saveToken(auth.tokenPath, auth.token); err != nil {
 		err = xerrors.Errorf("save token: %w", err)
 	}
 
-	message := "Authorization successful"
+	message := "Authorization successful, browser tab can be closed."
 	if err != nil {
 		message = fmt.Sprintf("Error! %v\n", err)
 		fmt.Println(message)

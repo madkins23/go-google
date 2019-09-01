@@ -67,7 +67,7 @@ Rename the file to `<applicationName>-secret.json` and move it to `~/.ssh`.
 
 ### `authorize`
 
-The `authorize` application, provided in the command section of this repository,
+The `authorize` application (provided in the command section of this repository)
 can be used to manually acquire an authorization token for an application.
 In general this is not required but it provides a good test of basic authorization functionality.
 
@@ -81,5 +81,6 @@ The token file will be created in `~/.ssh` for current and later use.
 
 ## Caveats
 
-Using `plain` mode for code verifier challenge.
+* Using `plain` mode for code verifier challenge.
 Tried to implement SHA256 version but was unable to get it to work.
+* Delete any previous token files if the access scopes change during development.
