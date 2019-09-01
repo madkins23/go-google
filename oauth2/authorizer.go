@@ -32,10 +32,12 @@ type authorizer struct {
 	state     string
 	scopes    []string
 	config    *goauth2.Config
+	ctxt      context.Context
 	listener  net.Listener
 	server    http.Server
 	token     *goauth2.Token
 	tokenPath string
+	verifier  goauth2.AuthCodeOption
 }
 
 // NewAuthorizer returns a new Authorizer object for the specified application name and access scopes.
@@ -54,6 +56,7 @@ func NewAuthorizer(applicationName string, accessScopes []string) (Authorizer, e
 
 	authorizer := &authorizer{
 		appName: applicationName,
+		ctxt:    context.Background(),
 		scopes:  fixedAccessScopes(accessScopes),
 		state:   state,
 	}
@@ -66,8 +69,13 @@ const (
 	driveTokenPathFmt  = ".ssh/%s-token.json"
 )
 
+var (
+	challengeMethod = goauth2.SetAuthURLParam("code_challenge_method", "plain")
+)
+
 // GetClient returns an HTTP client that can be used to access Google APIs.
-// Handles authorization for the application.
+// Handles authorization for the application, creating token file if necessary.
+// Get service from appropriate API (e.g. google.golang.org/api/drive.NewService()).
 func (auth *authorizer) GetClient() (*http.Client, error) {
 	// Get the client secret data.
 	secretPath, err := path.HomePath(fmt.Sprintf(driveSecretPathFmt, auth.appName))
@@ -91,6 +99,7 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 	}
 
 	auth.token, err = loadToken(auth.tokenPath)
+	err = xerrors.New("TODO: temporary")
 	if err != nil {
 		fmt.Println("Acquiring token from Google OAuth2 server.")
 
@@ -117,8 +126,24 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 		// Configure redirect URL using listener port.
 		auth.config.RedirectURL = "http://127.0.0.1:" + requestUrl.Port()
 
-		// Get Google authorization URL and attempt to open a browser tab.
-		authUrl := auth.config.AuthCodeURL(auth.state, goauth2.AccessTypeOffline)
+		// Code verifier to URL.
+		codeVerify, err := makeCodeVerifier()
+		if err != nil {
+			return nil, xerrors.Errorf("get code verifier: %w", err)
+		}
+
+		// The code verifier is sent using different keys at different times (WTF?).
+		//  Used during authorization call just below.
+		verifier := goauth2.SetAuthURLParam("code_challenge", codeVerify)
+		//  Used in the loopback server callback when calling golang.org/x/oauth2.Exchange().
+		auth.verifier = goauth2.SetAuthURLParam("code_verifier", codeVerify)
+
+		// Get Google authorization URL.
+		authUrl := auth.config.AuthCodeURL(auth.state, goauth2.AccessTypeOffline, challengeMethod, verifier)
+
+		fmt.Printf("--> Authorization URL:\n  %s\n", authUrl)
+
+		// Open authentication URL in browser.
 		if browser.OpenURL(authUrl) != nil {
 			fmt.Printf("Open URL %s in browser", authUrl)
 		}
@@ -138,7 +163,7 @@ func (auth *authorizer) GetClient() (*http.Client, error) {
 		return nil, xerrors.New("unable to acquire token")
 	}
 
-	return auth.config.Client(context.Background(), auth.token), nil
+	return auth.config.Client(auth.ctxt, auth.token), nil
 }
 
 const (
@@ -153,37 +178,40 @@ const (
 
 // handleCallback
 func (auth *authorizer) handleCallback(writer http.ResponseWriter, request *http.Request) {
-	message := "Unknown error prior to setting message"
-
 	urlData, err := url.ParseRequestURI(request.RequestURI)
 	if err != nil {
-		message = fmt.Sprintf("Error parsing request URI: %v", err)
-	}
-	query := urlData.Query()
-
-	if state := query.Get("state"); auth.state != state {
-		message = fmt.Sprintf("Authorization state does not match: '%s' != '%s'", auth.state, state)
-	} else if code := query.Get("code"); code == "" {
-		message = "Authorization code is empty"
-	} else if auth.token, err = auth.config.Exchange(context.Background(), query.Get("code")); err != nil {
-		message = fmt.Sprintf("Unable to get token: %v", err.Error())
+		err = xerrors.Errorf("parse request URI: %w", err)
+	} else if urlData.Path != "/" {
+		http.NotFound(writer, request)
+		return
+	} else if state := urlData.Query().Get("state"); auth.state != state {
+		err = xerrors.Errorf("check authorization state (%s != %s): %w", auth.state, state, err)
+	} else if code := urlData.Query().Get("code"); code == "" {
+		err = xerrors.Errorf("empty authorization code: %w", err)
+	} else if auth.token, err = auth.config.Exchange(
+		auth.ctxt, code, goauth2.AccessTypeOffline, challengeMethod, auth.verifier); err != nil {
+		err = xerrors.Errorf("get token: %w", err)
 	} else if err = saveToken(auth.tokenPath, auth.token); err != nil {
-		message = fmt.Sprintf("Unable to save token: %v", err.Error())
-	} else {
-		message = "Authorization successful"
+		err = xerrors.Errorf("save token: %w", err)
+	}
+
+	message := "Authorization successful"
+	if err != nil {
+		message = fmt.Sprintf("Error! %v\n", err)
+		fmt.Println(message)
 	}
 
 	_, err = fmt.Fprint(writer, fmt.Sprintf(callbackResponesFmt, auth.appName, auth.appName, message))
 	if err != nil {
-		fmt.Printf("Error shutting down server: %v\n", err)
+		fmt.Printf("Error writing response: %v\n", err)
 	}
 
 	// Shutdown server after done handling request.
 	go func() {
-		if err = auth.server.Shutdown(context.Background()); err != nil {
+		if err = auth.server.Shutdown(auth.ctxt); err != nil {
 			fmt.Printf("Error shutting down server: %v\n", err)
 		} else {
-			fmt.Printf("Embedded HTTP server closed")
+			fmt.Println("Embedded HTTP server closed")
 		}
 	}()
 }
@@ -212,7 +240,7 @@ const (
 	stateLengthHigh = 31
 )
 
-// Make a random state string.
+// makeStateString makes a random state string.
 func makeStateString() (string, error) {
 	state, err := makeRandomString(stateLengthLow + rand.Intn(stateLengthHigh-stateLengthLow))
 
@@ -224,7 +252,7 @@ func makeStateString() (string, error) {
 }
 
 const (
-	// Authorization challenge size range.
+	// Authorization verifier size range.
 	verifierLengthLow  = 43
 	verifierLengthHigh = 128
 )
