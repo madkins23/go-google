@@ -78,3 +78,8 @@ When properly configured it will look for an existing access token in `~/.ssh/<a
 If not found a browser window will (hopefully) be initiated for user interaction
 and a temporary loopback HTTP server will be called from the browser with the access token data.
 The token file will be created in `~/.ssh` for current and later use.
+
+## Caveats
+
+Using `plain` mode for code verifier challenge.
+Tried to implement SHA256 version but was unable to get it to work.
