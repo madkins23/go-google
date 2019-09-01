@@ -1,6 +1,2 @@
-* check for final items (e.g. SHA1 bit)
-  * code_challenge (uses code verifier)
-  * code_challenge_method
-  [code_challenge must also be sent when using token?]
+* code verifier with SHA1 hash
 * can we detect changes in access assigned to token and re-get token?
-
