@@ -49,7 +49,7 @@ type authorizer struct {
 func NewAuthorizer(applicationName string, accessScopes []string) (Authorizer, error) {
 	var err error
 
-	state, err := makeStateString()
+	state, err := makeState()
 	if err != nil {
 		return nil, xerrors.Errorf("make auth state: %w", err)
 	}
@@ -251,8 +251,8 @@ const (
 	stateLengthHigh = 31
 )
 
-// makeStateString makes a random state string.
-func makeStateString() (string, error) {
+// makeState makes a random state string.
+func makeState() (string, error) {
 	state, err := makeRandomString(stateLengthLow + rand.Intn(stateLengthHigh-stateLengthLow))
 
 	if err != nil {

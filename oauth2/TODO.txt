@@ -1,5 +1,6 @@
-* unit tests
-* test with vanguard
+* test with a real application
+* more unit tests?
+  just did simple ones, the rest will require much more work
 * code verifier with SHA1 hash
   tried this and failed, not sure what was problem
 * can we detect changes in access assigned to token and re-get token?

@@ -14,7 +14,7 @@ authorize <applicationName> <accessScope>*
 
 The `applicationName` must be the name used when configuring the keys using
 the Google developer console
-(see [documentation for the `oauth` package](../../oauth2/README.md)).
+(see [documentation for the `oauth2` package](../../oauth2/README.md)).
 
 An `accessScope` represents a permission that a user must agree to
 during the authorization process.
