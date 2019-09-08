@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/pkg/browser"
@@ -208,19 +209,19 @@ func (auth *authorizer) handleCallback(writer http.ResponseWriter, request *http
 
 	message := "Authorization successful, browser tab can be closed."
 	if err != nil {
-		message = fmt.Sprintf("Error! %v\n", err)
-		fmt.Println(message)
+		message = fmt.Sprintf("*** Error! %v\n", err)
+		fmt.Fprintln(os.Stderr, message)
 	}
 
 	_, err = fmt.Fprint(writer, fmt.Sprintf(callbackResponesFmt, auth.appName, auth.appName, message))
 	if err != nil {
-		fmt.Printf("Error writing response: %v\n", err)
+		fmt.Fprintf(os.Stderr, "*** Error writing response: %v\n", err)
 	}
 
 	// Shutdown server after done handling request.
 	go func() {
 		if err = auth.server.Shutdown(auth.ctxt); err != nil {
-			fmt.Printf("Error shutting down server: %v\n", err)
+			fmt.Fprintf(os.Stderr, "*** Error shutting down server: %v\n", err)
 		} else {
 			fmt.Println("Embedded HTTP server closed")
 		}
