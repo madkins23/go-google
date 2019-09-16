@@ -17,7 +17,6 @@ Once you have a project, set the developer console to that project using the dro
 
 Use **ENABLE APIS AND SERVICES** to select Google APIs that are required for the project.
 An API will include multiple *Access Scopes*.
-It is likely that you will always need access to the `drive` API.
 
 Then use the **OAuth consent screen** to configure:
 
