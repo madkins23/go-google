@@ -15,4 +15,5 @@ require (
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	google.golang.org/api v0.4.0
 	google.golang.org/appengine v1.5.0 // indirect
+    gopkg.in/yaml.v2 v2.2.4
 )
